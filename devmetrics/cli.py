@@ -21,7 +21,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from devmetrics import store
+from devmetrics import evidence, store
 from devmetrics.join import attribute
 from devmetrics.sources import omniroute, opencode
 
@@ -118,25 +118,57 @@ def cmd_sessions(args) -> int:
 
 
 def cmd_label(args) -> int:
-    if args.label not in LABELS:
+    explicit, accept = args.label, args.yes
+    if explicit and explicit not in LABELS:
         print(f"error: label must be one of {', '.join(LABELS)}",
               file=sys.stderr)
         return 4
     db = store.connect(args.warehouse)
-    if args.target == "latest":
-        row = db.execute(
-            "SELECT session_oid FROM requests WHERE session_oid IS NOT NULL"
-            " ORDER BY ts DESC LIMIT 1").fetchone()
-        if not row:
-            print("error: no attributed sessions yet — run `devmetrics sync`",
-                  file=sys.stderr)
-            db.close()
-            return 3
-        store.set_label(db, row["session_oid"], args.label)
-    else:
-        store.set_label(db, args.target, args.label)
-    db.close()
-    return 0
+    try:
+        if args.target != "latest":
+            oid = args.target
+        else:
+            row = db.execute(
+                "SELECT session_oid FROM requests WHERE session_oid IS NOT"
+                " NULL ORDER BY ts DESC LIMIT 1").fetchone()
+            if not row:
+                print("error: no attributed sessions yet — run"
+                      " `devmetrics sync`", file=sys.stderr)
+                return 3
+            oid = row["session_oid"]
+
+        proposal, reasons = evidence.propose(
+            evidence.read_evidence(args.opencode, oid))
+        if explicit:
+            store.set_label(db, oid, explicit, source="manual")
+            print(f"recorded {oid[:8]}: {explicit} (manual;"
+                  f" evidence proposed {proposal})")
+            return 0
+
+        print(f"proposed: {proposal}"
+              f" ({oid[:8]}…; {'; '.join(reasons)})")
+        if accept:
+            store.set_label(db, oid, proposal, source="accepted")
+            print("accepted")
+            return 0
+        if sys.stdin.isatty():
+            answer = input("Enter=accept, 1=good 2=meh 3=rework, n=skip: ")
+            if answer in ("", "1", "2", "3"):
+                chosen = {1: "good", 2: "meh", 3: "rework"}[int(answer)]
+                store.set_label(db, oid, chosen, source="accepted"
+                                if chosen == proposal else "manual")
+                print("accepted" if chosen == proposal
+                      else f"recorded {oid[:8]}: {chosen} (manual)")
+                return 0
+            if answer == "n":
+                print("left unlabeled")
+                return 0
+        else:
+            print("not interactive: confirm with --yes or an explicit"
+                  " good|meh|rework")
+        return 0
+    finally:
+        db.close()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -154,7 +186,9 @@ def build_parser() -> argparse.ArgumentParser:
         view.set_defaults(func=func)
     label = sub.add_parser("label")
     label.add_argument("target")
-    label.add_argument("label")
+    label.add_argument("label", nargs="?", default=None)
+    label.add_argument("--yes", action="store_true",
+                       help="accept the current proposal")
     label.set_defaults(func=cmd_label)
     return parser
 

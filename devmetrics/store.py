@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS labels (
   project TEXT,
   title TEXT,
   label TEXT NOT NULL CHECK (label IN ('good', 'meh', 'rework')),
-  at INTEGER NOT NULL
+  at INTEGER NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual'
 );
 CREATE TABLE IF NOT EXISTS kv (
   key TEXT PRIMARY KEY,
@@ -56,7 +57,18 @@ def connect(path: str) -> sqlite3.Connection:
     db = sqlite3.connect(path)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
+    _migrate(db)
     return db
+
+
+def _migrate(db: sqlite3.Connection) -> None:
+    # 0.1.0 warehouses predate the source column on labels.
+    columns = {row[1] for row in db.execute("PRAGMA table_info(labels)")}
+    if "source" not in columns:
+        db.execute(
+            "ALTER TABLE labels ADD COLUMN source TEXT NOT NULL"
+            " DEFAULT 'manual'")
+        db.commit()
 
 
 def save_requests(db: sqlite3.Connection, requests: list[dict]) -> None:
@@ -80,18 +92,20 @@ def _row(request: dict) -> tuple:
     )
 
 
-def set_label(db: sqlite3.Connection, session_oid: str, label: str) -> None:
+def set_label(db: sqlite3.Connection, session_oid: str, label: str,
+              source: str = "manual") -> None:
     row = db.execute(
         "SELECT project, title FROM requests WHERE session_oid = ? LIMIT 1",
         (session_oid,)).fetchone()
     db.execute(
-        "INSERT INTO labels (session_oid, project, title, label, at)"
-        " VALUES (?,?,?,?,?)"
+        "INSERT INTO labels (session_oid, project, title, label, at, source)"
+        " VALUES (?,?,?,?,?,?)"
         " ON CONFLICT(session_oid) DO UPDATE SET"
         " project=excluded.project, title=excluded.title,"
-        " label=excluded.label, at=excluded.at",
+        " label=excluded.label, at=excluded.at, source=excluded.source",
         (session_oid, row["project"] if row else None,
-         row["title"] if row else None, label, int(time.time() * 1000)))
+         row["title"] if row else None, label, int(time.time() * 1000),
+         source))
     db.commit()
 
 

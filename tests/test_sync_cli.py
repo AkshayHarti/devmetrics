@@ -146,6 +146,7 @@ def test_label_is_recorded_and_replaced(tmp_path, capsys) -> None:
     out = capsys.readouterr().out
     assert "good" in out and "HD1 acceptance" in out
     assert main([*args, "label", "latest", "rework"]) == 0
+    capsys.readouterr()
     assert main([*args, "sessions"]) == 0
     out = capsys.readouterr().out
     assert "rework" in out

@@ -18,7 +18,9 @@ uv sync && uv run devmetrics sync                 # ledger + attribution
 uv run devmetrics cost [--since 3d|YYYY-MM-DD]    # money view, by project
 uv run devmetrics models                          # volume, success rate, $ per model
 uv run devmetrics sessions [--since ...]          # session table with labels
-uv run devmetrics label latest good|meh|rework    # the one manual act
+uv run devmetrics label            # evidence-based proposal, one tap confirm
+uv run devmetrics label latest --yes        # accept the proposal
+uv run devmetrics label latest rework       # override (wins over evidence)
 ```
 
 Data sources: omniroute's `request_cost_ledger` (read-only), OpenCode's
