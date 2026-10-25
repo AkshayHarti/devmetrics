@@ -10,4 +10,21 @@ answer: what did this project cost, which model earns its price, where is the
 rework — and it renders the story for a retro.
 
 Design: [docs/specs/2026-10-25-devmetrics.md](docs/specs/2026-10-25-devmetrics.md).
- Construction starts there: `devmetrics sync` first, CLI after.
+
+## Implemented (v1)
+
+```bash
+uv sync && uv run devmetrics sync                 # ledger + attribution
+uv run devmetrics cost [--since 3d|YYYY-MM-DD]    # money view, by project
+uv run devmetrics models                          # volume, success rate, $ per model
+uv run devmetrics sessions [--since ...]          # session table with labels
+uv run devmetrics label latest good|meh|rework    # the one manual act
+```
+
+Data sources: omniroute's `request_cost_ledger` (read-only), OpenCode's
+session database for project attribution (±120 s activity window, exactly-one
+project rule — otherwise the row stays `unattributed` rather than guessed).
+Warehouse lives at `~/.local/share/devmetrics/ledger.sqlite`.
+
+Construction continues from the spec: `report` (retro renderer, family 4) and
+`forecast` (family 5) next, then the web dashboard on the same SQLite.
