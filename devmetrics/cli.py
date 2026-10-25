@@ -185,7 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
         view.add_argument("--since", default="0")
         view.set_defaults(func=func)
     label = sub.add_parser("label")
-    label.add_argument("target")
+    label.add_argument("target", nargs="?", default="latest")
     label.add_argument("label", nargs="?", default=None)
     label.add_argument("--yes", action="store_true",
                        help="accept the current proposal")

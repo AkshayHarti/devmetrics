@@ -35,6 +35,15 @@ def setup(tmp_path, messages) -> list[str]:
             "--warehouse", str(tmp_path / "devmetrics.sqlite")]
 
 
+def test_bare_label_defaults_to_latest(tmp_path, capsys) -> None:
+    args = setup(tmp_path, clean_session())
+    assert main([*args, "sync"]) == 0
+    capsys.readouterr()
+    assert main([*args, "label", "--yes"]) == 0
+    out = capsys.readouterr().out
+    assert "proposed: good" in out and "accepted" in out
+
+
 def test_proposal_good_for_a_clean_session(tmp_path, capsys) -> None:
     args = setup(tmp_path, clean_session())
     assert main([*args, "sync"]) == 0
